@@ -1715,7 +1715,7 @@ fn with_the_scrobbler_log_on_a_song_heard_half_way_is_written_for_an_uploader() 
         let lines: Vec<&str> = log.lines().collect();
         assert_eq!(
             &lines[..3],
-            ["#AUDIOSCROBBLER/1.1", "#TZ/UTC", "#CLIENT/slot"]
+            ["#AUDIOSCROBBLER/1.1", "#TZ/UTC", "#CLIENT/mute"]
         );
         assert_eq!(lines.len(), 4, "once: {log}");
         let fields: Vec<&str> = lines[3].split('\t').collect();

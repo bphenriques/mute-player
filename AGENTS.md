@@ -96,6 +96,35 @@ State has one owner, and threads share no mutable state, only messages:
 - **Timing is tested against a clock**: the player's status is held to what a device model has
   really played (`mute-audio/tests/player.rs`, `Device`), not to what was written.
 
+## Looking at the screens
+
+A change that shows is looked at, not only tested: the tour draws every screen, light and dark,
+without a device, into `target/shots/`, named in the order a listener meets them
+(`01-music`, `12-now-playing`, …):
+
+```sh
+nix-shell --run "cargo test -q -p mute-view --test shots -- --ignored"
+```
+
+Render before and after a change, and read the pictures that changed. A new screen or state gets
+a stop in the tour (`tour` in `crates/mute-view/tests/shots.rs`). A few shots depend on timing (a
+song's time, the visualizer, a notice) and differ a little run to run.
+
+## The host, slot
+
+slot (github.com/bphenriques/slot, branch `bphenriques-improvements`, checked out beside this as
+`../slot`) builds these crates in at a pinned `rev` in its `crates/slot/Cargo.toml`, and keeps
+only its host: `music_faces.rs` (the view's faces into its compositor) and `app/music.rs` (its
+buttons into `mute`, the screen off, power, volume and the lid). A change goes:
+
+1. Here: the change, its tests, the screenshots looked at; committed and pushed.
+2. In slot: `rev` moved to that commit, `task check:music` there, then `task dist:device` and
+   the card synced, when asked, to try it on the device.
+
+To build slot against this checkout before pushing, slot's gitignored `.cargo/config.toml`
+patches the git source with paths here (slot's `AGENTS.md` shows it). A change to what a host
+sees (`Frame`, `Textures`, `MusicFaces`, `Music`'s methods) is a change to slot too: make both.
+
 ## Check before you finish
 
 ```sh

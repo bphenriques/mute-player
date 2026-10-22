@@ -29,7 +29,7 @@ pub const KEYS: [(&str, &[(&str, &str)]); 6] = [
             ("SELECT", "Now Playing, then the queue"),
             ("SELECT + L1 / R1", "Previous / next song"),
             ("B held", "Back to the Music menu"),
-            ("MENU", "Back to slot"),
+            ("MENU", "Leave"),
         ],
     ),
     (

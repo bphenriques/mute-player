@@ -8,7 +8,7 @@ use crate::library::TrackId;
 pub const FILE: &str = ".scrobbler.log";
 /// What the file begins with, as the format has it: its version, the time zone of the times in
 /// it, and what wrote it.
-pub const HEADER: &str = "#AUDIOSCROBBLER/1.1\n#TZ/UTC\n#CLIENT/slot\n";
+pub const HEADER: &str = "#AUDIOSCROBBLER/1.1\n#TZ/UTC\n#CLIENT/mute\n";
 
 /// Songs shorter than this are not scrobbled; past this much heard, a longer one is.
 const SHORTEST: f64 = 30.0;

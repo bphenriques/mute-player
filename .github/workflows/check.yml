@@ -1,0 +1,14 @@
+# Format, lints and tests on every push, as AGENTS.md lists them: a host pins a revision of
+# these crates and trusts it passed.
+name: check
+on: [push, pull_request]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Installs the toolchain rust-toolchain.toml pins; CMake, for libopus, is on the runner.
+      - run: rustup show
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
