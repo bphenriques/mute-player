@@ -797,8 +797,7 @@ fn folders_list_their_folders_by_name_then_their_songs_by_file_name_as_on_the_ca
 
 #[test]
 fn an_opus_file_is_filed_by_its_own_tags() {
-    let opus =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../mute-audio/tests/fixtures/tone.opus");
+    let opus = Path::new(env!("CARGO_MANIFEST_DIR")).join("../mute-audio/tests/fixtures/tone.opus");
     let d = tempfile::tempdir().unwrap();
     let to = d.path().join("Music/any/where.opus");
     std::fs::create_dir_all(to.parent().unwrap()).unwrap();
