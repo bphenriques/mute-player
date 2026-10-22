@@ -1,0 +1,24 @@
+[package]
+name = "mute-view"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+# The music screen as the kit draws it: a mute::Screen made into the kit's faces each
+# frame, for any host that keeps textures and shows the faces.
+[dependencies]
+mute = { path = "../mute" }
+mute-ui = { path = "../mute-ui" }
+
+# The tour of the screens, as pictures: a card made with tagged songs and covers, played into
+# silence.
+[dev-dependencies]
+mute-audio = { path = "../mute-audio" }
+lofty.workspace = true
+png.workspace = true
+tempfile.workspace = true
+
+[lints.clippy]
+match_bool = "warn"
+undocumented_unsafe_blocks = "warn"
