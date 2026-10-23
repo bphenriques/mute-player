@@ -98,17 +98,20 @@ State has one owner, and threads share no mutable state, only messages:
 
 ## Looking at the screens
 
-A change that shows is looked at, not only tested: the tour draws every screen, light and dark,
-without a device, into `target/shots/`, named in the order a listener meets them
-(`01-music`, `12-now-playing`, …):
+A change that shows is looked at, not only tested. Every screen, light and dark, has its picture
+in `screenshots/`, named in the order a listener meets them (`dark-01-music`, …), and a test
+draws each again without a device and checks it against its picture: on its own clock, with a
+player that plays nothing (a tape), so the same screen draws the same pixels every time.
 
 ```sh
-nix-shell --run "cargo test -q -p mute-view --test shots -- --ignored"
+nix-shell --run "cargo test -q -p mute-view --test shots"                  # check
+nix-shell --run "UPDATE_SHOTS=1 cargo test -q -p mute-view --test shots"   # draw again
 ```
 
-Render before and after a change, and read the pictures that changed. A new screen or state gets
-a stop in the tour (`tour` in `crates/mute-view/tests/shots.rs`). A few shots depend on timing (a
-song's time, the visualizer, a notice) and differ a little run to run.
+A change that shows fails the check, naming the screens: each is drawn into `target/shots/` to
+read. Read the ones it names; if they are as meant, draw them again and commit the pictures with
+the change, where its diff shows them. A new screen or state gets a stop in the tour (`tour` in
+`crates/mute-view/tests/shots.rs`).
 
 ## The host, slot
 

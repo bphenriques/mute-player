@@ -18,7 +18,7 @@ pub mod text;
 pub use browse::rows::RowText;
 pub use library::covers::Art;
 pub use library::AlbumId;
-pub use music::{Button, Input, Music};
+pub use music::{Button, Engine, Input, Music, Now, Start};
 pub use mute_audio::Handle;
 pub use playback::player::Repeat;
 pub use screens::{

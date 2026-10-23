@@ -48,10 +48,11 @@ nix-shell --run "cargo test --workspace"
 
 ## The screens
 
-Each screen, light and dark, drawn without a device into `target/shots/`, to look at a change:
+Every screen, light and dark, is in [`screenshots/`](screenshots), and a test checks each is
+still drawn so. After a change that shows, read what changed in `target/shots/`, and keep it:
 
 ```sh
-nix-shell --run "cargo test -q -p mute-view --test shots -- --ignored"
+nix-shell --run "UPDATE_SHOTS=1 cargo test -q -p mute-view --test shots"
 ```
 
 ## Licence

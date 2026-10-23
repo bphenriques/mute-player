@@ -1,10 +1,10 @@
 //! The player as the music's shell sees it: told commands, read for its status, asked what
-//! happened. slot-player's `Handle` is one; a test's own, which answers as the test says, is
+//! happened. mute-audio's `Handle` is one; a test's own, which answers as the test says, is
 //! another.
 
 use mute_audio::{Command, Event, Handle, Status};
 
-pub(crate) trait Engine {
+pub trait Engine {
     fn send(&self, command: Command);
     fn status(&self) -> Status;
     /// What happened since last asked.
@@ -26,4 +26,4 @@ impl Engine for Handle {
 }
 
 /// Starts a player: the device's, or a test's; again whenever the last is gone.
-pub(crate) type Start = Box<dyn Fn() -> Box<dyn Engine>>;
+pub type Start = Box<dyn Fn() -> Box<dyn Engine>>;

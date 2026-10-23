@@ -46,7 +46,7 @@ use crate::text::Notice;
 use art::Pictures;
 use books::Books;
 pub use controller::{Button, Input};
-use engine::{Engine, Start};
+pub use engine::{Engine, Start};
 use input::Buttons;
 use loading::{spawn_scan, Found, Scan};
 use mute_audio::{Command, Event, Handle, PlayState};
@@ -108,10 +108,10 @@ enum Msg {
 /// The outside as the state sees it, read once as something comes in: the moment, for what is
 /// timed; the seconds since 1970, for what is kept; and a number new each time, for a shuffle.
 #[derive(Copy, Clone)]
-pub(crate) struct Now {
-    pub(crate) at: Instant,
-    pub(crate) wall: u64,
-    pub(crate) seed: u64,
+pub struct Now {
+    pub at: Instant,
+    pub wall: u64,
+    pub seed: u64,
 }
 
 /// The system's time.
@@ -191,8 +191,9 @@ impl Music {
     }
 
     /// As `spawn`, pictures shrunk to `px` (Now Playing's, a row's), playing through what
-    /// `start` starts, its time from `clock`.
-    pub(crate) fn with(
+    /// `start` starts, its time from `clock`: a host's own player and clock, or a test's, which
+    /// plays at the test's pace and keeps its time.
+    pub fn with(
         root: &Path,
         (art_px, thumb_px): (u32, u32),
         start: Start,

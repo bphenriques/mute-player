@@ -1,15 +1,19 @@
 //! The music screen without a device: the view's faces, drawn by the kit, put into pixels here
-//! instead of a GPU, so a test can look at what a screen shows, and `task shots` can keep a
-//! picture of each for a person (or an agent) to review.
+//! instead of a GPU, so a test can look at what a screen shows, and every screen is checked
+//! against its picture in `screenshots/`, for a person (or an agent) to review a change by.
 //!
-//! The music runs as a host runs it, on a card made for the test, with a player that plays into
-//! silence at the speed a device would; the screen is drawn as a compositor would draw it, a
-//! straight alpha blend of each texture and rectangle in turn.
+//! The music runs as a host runs it, on a card made for the test, on the tour's own clock with a
+//! player that plays nothing (a tape), so a screen draws the same pixels on every run; it is
+//! drawn as a compositor would draw it, a straight alpha blend of each texture and rectangle in
+//! turn.
 
+use std::cell::{Cell, RefCell};
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::time::Duration;
 
-use mute::{Body, Button, Handle, Input, Music};
+use mute::{Body, Button, Engine, Input, Music, Now};
+use mute_audio::{Command, Event, PlayState, Status};
 use mute_ui::{Canvas, Draw, MusicTheme, TexId, ART_BOX, THUMB_PX};
 use mute_view::{Frame, MusicText, Textures};
 
@@ -106,37 +110,100 @@ fn texture(textures: &Pixels, id: TexId) -> &(u32, u32, Vec<u8>) {
         .expect("a texture the screen was given")
 }
 
-/// Where the sound goes: nowhere, at the pace a device takes it, so a song plays for as long
-/// as it lasts.
-struct Silence {
-    rate: u32,
+/// A frame on the tour's clock, and the real time each gives the threads that read pictures and
+/// lyrics.
+const FRAME_MS: u64 = 16;
+const THREADS_MS: Duration = Duration::from_millis(4);
+
+/// How long each song the tour makes plays, as the tape has it: a minute, as `wav` writes them.
+const LEN: f64 = 60.0;
+
+/// The tour's clock: how far it has gone, a frame at a time, shared with the tape that plays to
+/// it, so every screen is drawn at the same moment on every run.
+type Clock = Rc<Cell<Duration>>;
+
+/// A player that plays nothing, at the tour's pace: where it is by the tour's clock, as told,
+/// and a visualizer's bands as fixed as the rest.
+struct Tape {
+    clock: Clock,
+    head: RefCell<Head>,
 }
 
-impl mute_audio::Output for Silence {
-    fn set_rate(&mut self, rate: u32) -> bool {
-        self.rate = rate;
-        true
-    }
-
-    fn write(&mut self, samples: &[f32]) -> Result<(), String> {
-        let frames = samples.len() as f64 / 2.0;
-        std::thread::sleep(Duration::from_secs_f64(
-            frames / f64::from(self.rate.max(1)),
-        ));
-        Ok(())
-    }
-
-    fn delay(&mut self) -> u64 {
-        0
-    }
-
-    fn flush(&mut self) {}
-
-    fn release(&mut self) {}
+/// Where the tape is: what it does, where it was last told to be and when, how fast it goes,
+/// and whether the visualizer asks for its bands.
+#[derive(Default)]
+struct Head {
+    state: PlayState,
+    at: f64,
+    since: Duration,
+    speed: f32,
+    bands: bool,
 }
 
-fn silent() -> Handle {
-    Handle::on(Silence { rate: 48_000 })
+impl Tape {
+    /// Where it is on the tour's clock: on from where it was told, at its speed, while it plays.
+    fn place(&self, head: &Head) -> f64 {
+        let gone = self.clock.get().saturating_sub(head.since).as_secs_f64();
+        match head.state {
+            PlayState::Playing => (head.at + gone * f64::from(head.speed)).min(LEN),
+            _ => head.at,
+        }
+    }
+}
+
+impl Engine for Tape {
+    fn send(&self, command: Command) {
+        let now = self.clock.get();
+        let mut head = self.head.borrow_mut();
+        let place = self.place(&head);
+        match command {
+            Command::Play { at, speed, .. } => {
+                *head = Head {
+                    state: PlayState::Playing,
+                    at,
+                    since: now,
+                    speed,
+                    ..*head
+                }
+            }
+            Command::Cue { at, speed, .. } => {
+                *head = Head {
+                    state: PlayState::Paused,
+                    at,
+                    since: now,
+                    speed,
+                    ..*head
+                }
+            }
+            Command::Pause => (head.state, head.at) = (PlayState::Paused, place),
+            Command::Resume => (head.state, head.since) = (PlayState::Playing, now),
+            Command::Seek(at) => (head.at, head.since) = (at, now),
+            Command::Speed(speed) => (head.at, head.since, head.speed) = (place, now, speed),
+            Command::Stop => (head.state, head.at) = (PlayState::Stopped, 0.0),
+            Command::Spectrum(on) => head.bands = on,
+            _ => {}
+        }
+    }
+
+    fn status(&self) -> Status {
+        let head = self.head.borrow();
+        let playing = head.state == PlayState::Playing;
+        Status {
+            state: head.state,
+            at: self.place(&head),
+            len: LEN,
+            sounding: playing,
+            // Louder in the bass, as music is, with a little rise and fall along the bands.
+            spectrum: head.bands.then(|| {
+                std::array::from_fn(|i| (190 - 4 * i as i32 + (i as i32 * 37 % 50)) as u8)
+            }),
+            ..Status::default()
+        }
+    }
+
+    fn events(&self) -> Vec<Event> {
+        Vec::new()
+    }
 }
 
 /// A card to look at, as a listener's might be: albums by a few artists, invented, tagged as a
@@ -350,8 +417,8 @@ struct Screen {
     textures: Pixels,
     /// The light theme, else the dark.
     light: bool,
-    /// When it started, for the clock the view moves on.
-    began: std::time::Instant,
+    /// The tour's own time, which the music, the tape and the view all keep.
+    clock: Clock,
     /// How many frames a screenshot draws first, for what moves into place to arrive.
     settle: u32,
     _card: tempfile::TempDir,
@@ -361,27 +428,62 @@ impl Screen {
     fn new(fill: impl FnOnce(&Path)) -> Screen {
         let card = tempfile::tempdir().unwrap();
         fill(card.path());
-        let mut music = Music::spawn(card.path(), ART_BOX, THUMB_PX, silent);
+        let clock = Clock::default();
+        let tape = {
+            let clock = clock.clone();
+            move || -> Box<dyn Engine> {
+                let head = RefCell::new(Head::default());
+                let clock = clock.clone();
+                Box::new(Tape { clock, head })
+            }
+        };
+        // The music's clock is the tour's: the same moment, the same day and the same shuffle on
+        // every run.
+        let now = {
+            let (clock, first) = (clock.clone(), std::time::Instant::now());
+            move || {
+                let gone = clock.get();
+                Now {
+                    at: first + gone,
+                    wall: 1_700_000_000 + gone.as_secs(),
+                    seed: 1 + gone.as_millis() as u64,
+                }
+            }
+        };
+        let mut music = Music::with(
+            card.path(),
+            (ART_BOX, THUMB_PX),
+            Box::new(tape),
+            Box::new(now),
+        );
         music.open();
         let mut screen = Screen {
             music,
             view: MusicText::default(),
             light: false,
             textures: Pixels::default(),
-            began: std::time::Instant::now(),
+            clock,
             settle: 40,
             _card: card,
         };
-        // Until the library is read and its pictures made.
-        screen.wait(1500);
+        // Until the library is read and its pictures made, by threads on the real clock.
+        screen.frames(1500 / FRAME_MS, Duration::from_millis(FRAME_MS));
         screen
     }
 
-    /// Lets `ms` go by, frame by frame, as a host does: the music polled each.
+    /// Lets `ms` go by on the tour's clock, frame by frame, as a host does: the music polled
+    /// each. Each frame gives the threads that read pictures and lyrics a moment of real time
+    /// too, so what they read has come by the next.
     fn wait(&mut self, ms: u64) {
-        for _ in 0..ms / 16 {
+        self.frames(ms / FRAME_MS, THREADS_MS);
+    }
+
+    fn frames(&mut self, n: u64, real: Duration) {
+        for _ in 0..n {
+            self.clock
+                .set(self.clock.get() + Duration::from_millis(FRAME_MS));
             self.music.poll(false);
-            std::thread::sleep(Duration::from_millis(16));
+            std::thread::sleep(real);
         }
     }
 
@@ -454,7 +556,7 @@ impl Screen {
             thumbs: self.music.thumbs(),
             theme: MusicTheme::of(self.light),
             canvas: Canvas::FRAMED,
-            now: self.began.elapsed().as_millis() as u64,
+            now: self.clock.get().as_millis() as u64,
         };
         self.view.faces(frame, &mut self.textures).0
     }
@@ -741,18 +843,24 @@ fn keep_now(s: &mut Screen, keep: &dyn Fn(&mut Screen, &str), name: &str) {
     s.settle = 40;
 }
 
-/// Every music screen worth a look, as pictures in `target/shots`, light and dark: `task shots`.
+/// Every music screen, light and dark, against its picture in `screenshots/`: a screen drawn
+/// otherwise than its picture, or with none, fails, naming it. Each is drawn into
+/// `target/shots/` too, to look at; `UPDATE_SHOTS=1` draws them into `screenshots/` instead, to
+/// commit with the change that made them.
 #[test]
-#[ignore = "pictures for a person to review: task shots"]
-fn shots() {
-    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/shots");
-    std::fs::create_dir_all(&dir).unwrap();
+fn every_screen_looks_as_its_picture_in_screenshots_says() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let (kept, drawn) = (root.join("screenshots"), root.join("target/shots"));
+    std::fs::create_dir_all(&drawn).unwrap();
+    let shots = RefCell::new(Vec::new());
     for light in [false, true] {
         let theme = if light { "light" } else { "dark" };
         let mut screen = Screen::new(card);
         screen.light(light);
         let keep = |s: &mut Screen, name: &str| {
-            s.shot().save(&dir.join(format!("{theme}-{name}.png")));
+            shots
+                .borrow_mut()
+                .push((format!("{theme}-{name}.png"), s.shot()));
         };
         tour(&mut screen, &keep);
     }
@@ -760,8 +868,49 @@ fn shots() {
         std::fs::create_dir_all(root.join("Config")).unwrap();
         std::fs::write(root.join("Config/music.txt"), "help = seen\n").unwrap();
     });
-    empty.shot().save(&dir.join("dark-36-empty-card.png"));
+    shots
+        .borrow_mut()
+        .push(("dark-36-empty-card.png".into(), empty.shot()));
     empty.open("Library");
-    empty.shot().save(&dir.join("dark-37-empty-library.png"));
-    println!("pictures in {}", dir.display());
+    shots
+        .borrow_mut()
+        .push(("dark-37-empty-library.png".into(), empty.shot()));
+    let shots = shots.into_inner();
+    if std::env::var_os("UPDATE_SHOTS").is_some() {
+        let _ = std::fs::remove_dir_all(&kept);
+        std::fs::create_dir_all(&kept).unwrap();
+        for (name, shot) in &shots {
+            shot.save(&kept.join(name));
+        }
+        return;
+    }
+    let mut changed: Vec<&str> = Vec::new();
+    for (name, shot) in &shots {
+        shot.save(&drawn.join(name));
+        if pixels(&kept.join(name)).as_deref() != Some(&shot.rgba[..]) {
+            changed.push(name);
+        }
+    }
+    let names: Vec<&str> = shots.iter().map(|(n, _)| n.as_str()).collect();
+    let pictures = std::fs::read_dir(&kept).into_iter().flatten().flatten();
+    let gone: Vec<String> = pictures
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .filter(|n| !names.contains(&n.as_str()))
+        .collect();
+    assert!(
+        changed.is_empty() && gone.is_empty(),
+        "screens drawn otherwise than their pictures: {changed:?}; pictures of no screen: \
+         {gone:?}. Look at them in target/shots, and if they are as meant, run again with \
+         UPDATE_SHOTS=1 to keep them."
+    );
+}
+
+/// The RGBA pixels of the PNG at `path`, if there is one.
+fn pixels(path: &Path) -> Option<Vec<u8>> {
+    let decoder = png::Decoder::new(std::io::BufReader::new(std::fs::File::open(path).ok()?));
+    let mut reader = decoder.read_info().ok()?;
+    let mut rgba = vec![0; reader.output_buffer_size()];
+    let info = reader.next_frame(&mut rgba).ok()?;
+    rgba.truncate(info.buffer_size());
+    Some(rgba)
 }
