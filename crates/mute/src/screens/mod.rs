@@ -200,6 +200,8 @@ pub struct ListBody {
     pub rows: Vec<RowText>,
     /// A setting's value or a count beside its row.
     pub values: Vec<Option<String>>,
+    /// How far through each book row is, 0 to 1, as a thin bar along its picture.
+    pub done: Vec<Option<f32>>,
     pub selected: usize,
     /// Left and Right change the values: arrows show by the highlighted one.
     pub adjustable: bool,

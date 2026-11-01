@@ -174,8 +174,10 @@ fn the_audiobooks_menu_continues_the_latest_and_lists_them_by_progress_and_autho
     assert_eq!(b.view(), View::BookList(crate::BookList::Listening));
     let page = b.page(&cx);
     assert_eq!(page.rows[0].text, "Just So", "the latest listened to");
-    // A minute into the second part, after a minute-long first: two of four minutes.
-    assert_eq!(page.values[0].as_deref(), Some("50%"));
+    // A minute into the second part, after a minute-long first: two of four minutes left, and
+    // half way along its bar.
+    assert_eq!(page.values[0].as_deref(), Some("2 min left"));
+    assert_eq!(page.done[0], Some(50));
     assert_eq!(page.rows[1].text, "The Selfish Giant");
     // Authors, each with their books.
     b.press(&cx, Key::B);
@@ -235,17 +237,17 @@ fn a_book_s_keys_jump_mark_and_change_speed_and_list_its_marks_and_chapters() {
     let mut b = Browser::default();
     b.press(&cx, Key::Select);
     assert_eq!(b.view(), View::NowPlaying);
-    assert_eq!(b.press(&cx, Key::Left), Outcome::Seek(-30));
-    let fifteen = Context {
+    assert_eq!(b.press(&cx, Key::Left), Outcome::Seek(-15));
+    let thirty = Context {
         settings: Settings {
-            jump: 15,
+            jump: 30,
             ..Settings::default()
         },
         ..cx
     };
     assert_eq!(
-        b.press(&fifteen, Key::Right),
-        Outcome::Seek(15),
+        b.press(&thirty, Key::Right),
+        Outcome::Seek(30),
         "Jump Length"
     );
     assert_eq!(b.press(&cx, Key::R1), Outcome::Skip(1), "the next chapter");

@@ -69,7 +69,7 @@ fn settings_are_kept_on_the_card_but_the_sleep_timer_is_not() {
     let s = Settings {
         repeat: crate::Repeat::One,
         log: true,
-        jump: 15,
+        jump: 30,
         ..Settings::default()
     };
     store.save_settings(&s, &Settings::default());
@@ -122,4 +122,9 @@ fn advanced_ends_with_an_experimental_page_of_skip_silence() {
     assert_eq!(b.view(), View::Experimental);
     let page = b.page(&cx(&lib, QueueView::default(), s));
     assert_eq!(page.rows, ["Skip Silence"]);
+}
+
+#[test]
+fn a_book_jumps_fifteen_seconds_at_first_as_spotify_and_apple_do() {
+    assert_eq!(Settings::default().jump, 15);
 }

@@ -129,6 +129,7 @@ pub(super) fn faces(
         thumbed: body.thumbs,
         thumbs,
         seconds,
+        done: body.done,
         blank: body.thumbs.then_some(glyphs.blank[usize::from(body.books)]),
         playing,
         play: body

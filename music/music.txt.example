@@ -12,7 +12,7 @@ screen_off = pause
 open = left
 
 # How far Left and Right jump in an audiobook, in seconds: 10, 15 or 30.
-jump = 30
+jump = 15
 
 # The repeat mode, set on Now Playing's menu (START): off, all or one.
 repeat = off

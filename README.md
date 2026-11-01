@@ -9,6 +9,13 @@
 > Don't expect much support. I'm happy to help where I can, and happier still if someone forks
 > it and carries on the work (I'd gladly use the mature fork!) :)
 
+| | | |
+|---|---|---|
+| ![Now Playing](screenshots/dark-12-now-playing.png) | ![Synced lyrics](screenshots/dark-19-lyrics.png) | ![An album, in the light theme](screenshots/light-08-album.png) |
+| ![An audiobook playing](screenshots/dark-26-book.png) | ![Audiobooks in progress](screenshots/dark-23c-in-progress.png) | ![The equalizer](screenshots/dark-39-equalizer.png) |
+
+Every screen, light and dark, is in [`screenshots/`](screenshots).
+
 What I focused on:
 
 - **Pocket use.** With the screen off, the shoulders skip or seek and the triggers play, pause

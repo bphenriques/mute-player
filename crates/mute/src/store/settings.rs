@@ -78,7 +78,7 @@ impl Settings {
             jump: get("jump")
                 .and_then(|v| v.parse().ok())
                 .filter(|j| JUMPS.contains(j))
-                .unwrap_or(30),
+                .unwrap_or(Settings::default().jump),
             mono: is("mono", "on"),
             visualizer: is("visualizer", "on"),
             // Once track or album, chosen now by how the queue plays.

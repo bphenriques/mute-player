@@ -391,6 +391,8 @@ pub struct Page {
     pub rows: Vec<RowText>,
     /// A setting's value, or a count, beside its row.
     pub values: Vec<Option<String>>,
+    /// How far through each book row is, 0 to 100, drawn on its picture.
+    pub done: Vec<Option<u8>>,
     pub selected: usize,
     pub pages: usize,
     /// The highlighted item's place from 1, and how many items, not counting action rows.
@@ -590,6 +592,7 @@ impl Browser {
             },
             rows: shown().map(|&r| label(cx, view, r)).collect(),
             values: shown().map(|&r| value(cx, r)).collect(),
+            done: shown().map(|&r| rows::done(cx, r)).collect(),
             selected: at - span.start,
             highlighted: rows.get(at).copied(),
             rules: (1..span.len())

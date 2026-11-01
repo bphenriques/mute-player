@@ -245,6 +245,11 @@ pub(crate) fn rows_screen(music: &Music) -> Screen {
     let list = ListBody {
         rows: page.rows,
         values: page.values,
+        done: page
+            .done
+            .iter()
+            .map(|d| d.map(|d| f32::from(d) / 100.0))
+            .collect(),
         selected: page.selected,
         adjustable: matches!(legend, Legend::Settings | Legend::Menu | Legend::Tune),
         menu: view.is_menu(),

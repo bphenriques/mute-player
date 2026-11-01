@@ -617,6 +617,17 @@ fn fact(lib: &Library, t: TrackId, info: Info) -> String {
     }
 }
 
+/// How far through a book its row is, 0 to 100, once begun and until finished: the bar on its
+/// picture.
+pub(crate) fn done(cx: &Context, row: Row) -> Option<u8> {
+    let Row::Book(b) = row else {
+        return None;
+    };
+    let place = cx.shelf.place(cx.lib, b);
+    let done = books::progress(cx.lib, b, &place);
+    (!place.finished && done > 0.0).then(|| (done * 100.0).round() as u8)
+}
+
 /// A setting's choice, or a main-screen count.
 pub(crate) fn value(cx: &Context, row: Row) -> Option<String> {
     let count = |n: usize| (n > 0).then(|| n.to_string());
@@ -648,14 +659,20 @@ pub(crate) fn value(cx: &Context, row: Row) -> Option<String> {
         Row::Open(View::BookList(list)) => count(books::listed(cx.lib, cx.shelf, list).len()),
         Row::Open(View::Authors) => count(books::authors(cx.lib).len()),
         Row::Author(a) => count(books::by(cx.lib, a).len()),
-        // How far into a book, once begun.
+        // How long a book has left once begun, at its speed, as its Now Playing says; how far
+        // through when its length is not known.
         Row::Book(b) => {
             let place = cx.shelf.place(cx.lib, b);
             let done = books::progress(cx.lib, b, &place);
-            match (place.finished, done > 0.0) {
-                (true, _) => Some(text::FINISHED.into()),
-                (false, true) => Some(text::percent(done)),
-                (false, false) => None,
+            let secs = cx.lib.books[b].secs;
+            match (place.finished, done > 0.0, secs > 0.0) {
+                (true, _, _) => Some(text::FINISHED.into()),
+                (false, true, true) => {
+                    let into = books::into_book(cx.lib, b, place.part, place.pos);
+                    Some(text::time_left((secs - into) / f64::from(place.speed)))
+                }
+                (false, true, false) => Some(text::percent(done)),
+                (false, false, _) => None,
             }
         }
         // How long a book's chapter is: to the next, the last to the end of its part.

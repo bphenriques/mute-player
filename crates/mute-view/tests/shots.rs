@@ -833,6 +833,16 @@ fn tour(s: &mut Screen, keep: &dyn Fn(&mut Screen, &str)) {
     keep(s, "01b-music-playing");
     s.open("Audiobooks");
     keep(s, "23b-audiobooks-continue");
+    // A book a way in: In Progress says how long it has left, its bar how far through.
+    s.tap(Button::A);
+    s.wait(400);
+    for _ in 0..4 {
+        s.tap(Button::Right);
+    }
+    s.tap(Button::A);
+    s.tap(Button::B);
+    s.open("In Progress");
+    keep(s, "23c-in-progress");
 }
 
 /// Keeps the screen as it is this moment, for what lasts only a moment (a notice, a letter,

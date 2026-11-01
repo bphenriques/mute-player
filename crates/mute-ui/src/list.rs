@@ -7,7 +7,7 @@ use super::face::ROW_FACE_PAD;
 use super::theme::rgba;
 use super::{
     draw_progress, Ink, ListFaces, MusicFace, MusicTheme, BAR_INSET, CARET_GAP, LEGEND_Y,
-    LIST_TYPE_PER_ROW, MUSIC_HEART_ROOM, PROGRESS_Y, ROWS_Y, THUMB_PX, THUMB_ROOM,
+    LIST_TYPE_PER_ROW, MUSIC_HEART_ROOM, PROGRESS_H, PROGRESS_Y, ROWS_Y, THUMB_PX, THUMB_ROOM,
 };
 
 /// The type size of a page's rows: the quick menu's for menus, from the spacing for lists.
@@ -266,6 +266,16 @@ fn draw_thumb(list: &ListFaces, grid: Grid, i: usize, theme: &MusicTheme, out: &
         );
         push(out, tex, x, y, w, h);
     }
+    // A book begun: how far through, along its foot over all else, as podcast players show an
+    // episode; lit on a track that reads on the highlight and on any picture.
+    if let Some(done) = list.done.get(i).copied().flatten() {
+        let y = grid.row_mid(i, THUMB_PX) + THUMB_PX as f32 - PROGRESS_H;
+        let (x, w, h) = (QUICK_EDGE, THUMB_PX as f32, PROGRESS_H);
+        let colour = rgba(theme.ground, 1.0);
+        out.push(Draw::Rect { x, y, w, h, colour });
+        let (w, colour) = ((w * done.clamp(0.0, 1.0)).round(), rgba(theme.lit, 1.0));
+        out.push(Draw::Rect { x, y, w, h, colour });
+    }
 }
 
 /// How strongly the playing row's thumbnail is shaded under its play mark, of the ground.
@@ -423,6 +433,32 @@ mod tests {
         };
         assert_eq!(drawn(0), [blank], "on its empty square");
         assert_eq!(drawn(1), [picture], "the picture alone");
+    }
+
+    #[test]
+    fn a_book_begun_has_a_bar_along_its_thumbnail_s_foot_filled_as_far_as_it_is() {
+        let list = ListFaces {
+            two_lines: true,
+            thumbed: true,
+            thumbs: vec![None, None],
+            done: vec![None, Some(0.25)],
+            ..ListFaces::default()
+        };
+        let grid = Grid::new(false, 5);
+        let bars = |i| {
+            let mut out = Vec::new();
+            draw_thumb(&list, grid, i, &MusicTheme::dark(), &mut out);
+            out.iter()
+                .filter_map(|d| match *d {
+                    Draw::Rect { y, w, h, .. } if h == PROGRESS_H => Some((y, w)),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        };
+        assert!(bars(0).is_empty(), "not begun");
+        let foot = grid.row_mid(1, THUMB_PX) + THUMB_PX as f32 - PROGRESS_H;
+        let full = THUMB_PX as f32;
+        assert_eq!(bars(1), [(foot, full), (foot, (full / 4.0).round())]);
     }
 
     #[test]

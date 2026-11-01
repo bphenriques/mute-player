@@ -105,7 +105,8 @@ impl Setting {
     pub const EXPERIMENTAL: [Setting; 1] = [Setting::SkipSilence];
 }
 
-/// The jumps an audiobook offers, as players do: 15 is Apple's, 30 Audible's.
+/// The jumps an audiobook offers, as players do: 15, the first, is Apple's and Spotify's; 30
+/// Audible's.
 pub(crate) const JUMPS: [u32; 3] = [10, 15, 30];
 
 /// The choice `by` steps to from `at` in `order`: Left (-1) and Right (1) stop at the ends,
@@ -126,7 +127,7 @@ impl Default for Settings {
             repeat: Repeat::Off,
             screen_off: ScreenOff::Pause,
             open_playing: false,
-            jump: 30,
+            jump: 15,
             mono: false,
             visualizer: false,
             leveling: false,
