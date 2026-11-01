@@ -38,7 +38,10 @@ pub use face::{
     music_second_face, music_status_face, music_thumb_blank_face, music_window, Ink, LineInk,
     RowWords, MUSIC_STATUS,
 };
-pub use list::{music_menu_top, music_rich_px, music_row_ink, music_row_px, music_row_text_w};
+pub use list::{
+    music_menu_top, music_rich_px, music_row_bar_room, music_row_ink, music_row_px,
+    music_row_text_w,
+};
 pub use text_view::TextFaces;
 pub use theme::MusicTheme;
 pub use tint::{music_tint, music_tint_ink, MusicTint};
@@ -202,7 +205,8 @@ pub struct ListFaces {
     /// Whether the rows start with their album's thumbnail, and each one's, once read.
     pub thumbed: bool,
     pub thumbs: Vec<Option<MusicFace>>,
-    /// How far through each row's book is, 0 to 1, as a thin bar along its thumbnail's foot.
+    /// How far through each row's book is, 0 to 1, as a bar on its second line with its value
+    /// after it, rather than at the right.
     pub done: Vec<Option<f32>>,
     /// What an empty thumbnail shows, dim: a note, or a book.
     pub blank: Option<MusicFace>,

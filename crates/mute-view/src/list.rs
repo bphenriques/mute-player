@@ -6,8 +6,8 @@ use super::Textures;
 use mute::{AlbumId, Art, ListBody, RowText};
 use mute_ui::Canvas;
 use mute_ui::{
-    music_half_w, music_number_w, music_rich_px, music_row_ink, music_row_px, music_row_text_w,
-    music_text_width, Ink, ListFaces, MusicFace, MUSIC_STATUS,
+    music_half_w, music_number_w, music_rich_px, music_row_bar_room, music_row_ink, music_row_px,
+    music_row_text_w, music_text_width, Ink, ListFaces, MusicFace, MUSIC_STATUS,
 };
 
 use super::{Glyphs, MusicText, Spec};
@@ -46,20 +46,26 @@ pub(super) fn faces(
         .iter()
         .enumerate()
         .position(|(i, r)| r.playing && thumbed(i));
+    // A book begun has its bar on its second line, its value, the time left, after it.
+    let barred = |i: usize| body.two_lines && body.done.get(i).is_some_and(Option::is_some);
     let value_w = music_half_w(canvas);
     let mut values = Vec::with_capacity(body.values.len());
     for (i, value) in body.values.into_iter().enumerate() {
         // Dim, lit on the highlighted row, as in the quick menu; a name set as written, and on
         // the highlighted row scrolling, as a long name does.
         let named = body.rows.get(i).is_some_and(|r| r.named);
-        let spec = Spec::Row {
-            text: RowText {
-                cased: named,
-                ..RowText::plain(value.unwrap_or_default())
-            },
-            icon: None,
-            ink: if i == selected { Ink::Lit } else { Ink::Dim },
-            px: row_px,
+        let spec = if barred(i) {
+            Spec::Second(value.unwrap_or_default(), second_px)
+        } else {
+            Spec::Row {
+                text: RowText {
+                    cased: named,
+                    ..RowText::plain(value.unwrap_or_default())
+                },
+                icon: None,
+                ink: if i == selected { Ink::Lit } else { Ink::Dim },
+                px: row_px,
+            }
         };
         let scroll = (named && i == selected).then_some(scroll);
         values.push(
@@ -79,16 +85,22 @@ pub(super) fn faces(
         } else {
             0
         });
+        let value = values.get(i).copied().flatten().map_or(0, |(_, w, _)| w);
         seconds.push(second.and_then(|after| {
             let spec = Spec::Second(after, second_px);
-            let width = music_row_text_w(width, false, 0, thumbed(i));
+            let bar = if barred(i) {
+                music_row_bar_room(canvas) + value
+            } else {
+                0
+            };
+            let width = music_row_text_w(width, false, 0, thumbed(i)).saturating_sub(bar);
             text.seconds
                 .sync(compositor, text.theme, i, spec, width, None)
         }));
         // Faint rows read dim on the highlight; only it scrolls, or every row of a list that only
         // tells.
         let ink = music_row_ink(row.faint, i == selected);
-        let value = values.get(i).copied().flatten().map_or(0, |(_, w, _)| w);
+        let value = if barred(i) { 0 } else { value };
         let width = music_row_text_w(width, row.favorite, value, thumbed(i));
         // What plays is marked before its name where it has no picture to mark it on.
         let icon = (row.playing && !thumbed(i)).then_some(MUSIC_STATUS[usize::from(body.paused)]);

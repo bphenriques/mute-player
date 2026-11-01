@@ -659,8 +659,8 @@ pub(crate) fn value(cx: &Context, row: Row) -> Option<String> {
         Row::Open(View::BookList(list)) => count(books::listed(cx.lib, cx.shelf, list).len()),
         Row::Open(View::Authors) => count(books::authors(cx.lib).len()),
         Row::Author(a) => count(books::by(cx.lib, a).len()),
-        // How long a book has left once begun, at its speed, as its Now Playing says; how far
-        // through when its length is not known.
+        // How long a book has left once begun, at its speed, as its Now Playing says, after the bar
+        // on its second line; the bar alone when its length is not known.
         Row::Book(b) => {
             let place = cx.shelf.place(cx.lib, b);
             let done = books::progress(cx.lib, b, &place);
@@ -671,8 +671,7 @@ pub(crate) fn value(cx: &Context, row: Row) -> Option<String> {
                     let into = books::into_book(cx.lib, b, place.part, place.pos);
                     Some(text::time_left((secs - into) / f64::from(place.speed)))
                 }
-                (false, true, false) => Some(text::percent(done)),
-                (false, false, _) => None,
+                (false, _, _) => None,
             }
         }
         // How long a book's chapter is: to the next, the last to the end of its part.

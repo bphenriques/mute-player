@@ -212,6 +212,11 @@ pub(super) fn draw(list: &ListFaces, canvas: Canvas, theme: &MusicTheme, out: &m
                     sw,
                     sh,
                 );
+                if let Some(done) = done(list, i) {
+                    let end = x + indent + sw as f32 - pad;
+                    let y = top + name + LINE_GAP - ROW_FACE_PAD;
+                    draw_row_bar(list, i, (end, y, sh), done, canvas, theme, out);
+                }
             }
             (Some((tex, w, h)), None) => push(out, tex, x, grid.row_mid(i, h), w, h),
             _ => {}
@@ -266,16 +271,65 @@ fn draw_thumb(list: &ListFaces, grid: Grid, i: usize, theme: &MusicTheme, out: &
         );
         push(out, tex, x, y, w, h);
     }
-    // A book begun: how far through, along its foot over all else, as podcast players show an
-    // episode; lit on a track that reads on the highlight and on any picture.
-    if let Some(done) = list.done.get(i).copied().flatten() {
-        let y = grid.row_mid(i, THUMB_PX) + THUMB_PX as f32 - PROGRESS_H;
-        let (x, w, h) = (QUICK_EDGE, THUMB_PX as f32, PROGRESS_H);
-        let colour = rgba(theme.ground, 1.0);
-        out.push(Draw::Rect { x, y, w, h, colour });
-        let (w, colour) = ((w * done.clamp(0.0, 1.0)).round(), rgba(theme.lit, 1.0));
-        out.push(Draw::Rect { x, y, w, h, colour });
+}
+
+/// How far through row `i`'s book is, when it has a bar on its second line.
+fn done(list: &ListFaces, i: usize) -> Option<f32> {
+    list.done
+        .get(i)
+        .copied()
+        .flatten()
+        .filter(|_| list.two_lines)
+}
+
+/// A book's bar on its second line, as Spotify has an episode's: after who wrote it, from
+/// `end` (the text's end, its line's top and height), then its value, the time left.
+fn draw_row_bar(
+    list: &ListFaces,
+    i: usize,
+    (end, top, h): (f32, f32, u32),
+    done: f32,
+    canvas: Canvas,
+    theme: &MusicTheme,
+    out: &mut Vec<Draw>,
+) {
+    let (x, w) = (end + ROW_BAR_GAP, music_row_bar_w(canvas) as f32);
+    let y = (top + (h as f32 - PROGRESS_H) / 2.0).round();
+    out.push(Draw::Rect {
+        x,
+        y,
+        w,
+        h: PROGRESS_H,
+        colour: rgba(theme.dim, ROW_BAR_TRACK),
+    });
+    out.push(Draw::Rect {
+        x,
+        y,
+        w: (w * done.clamp(0.0, 1.0)).round(),
+        h: PROGRESS_H,
+        colour: rgba(theme.lit, 1.0),
+    });
+    if let Some((tex, vw, vh)) = list.values.get(i).copied().flatten() {
+        push(out, tex, x + w + ROW_BAR_GAP - MENU_PAD as f32, top, vw, vh);
     }
+}
+
+/// A book row's bar, a share of the text's room so it keeps its proportion on any screen, and
+/// the gaps either side of it.
+const ROW_BAR_SHARE: f32 = 0.2;
+const ROW_BAR_GAP: f32 = 12.0;
+
+/// How strong a book row's bar's track is, of the dim ink: seen on the highlight and off it.
+const ROW_BAR_TRACK: f32 = 0.4;
+
+/// How wide a book row's bar is on `canvas`.
+pub fn music_row_bar_w(canvas: Canvas) -> u32 {
+    (super::music_text_width(false, canvas) as f32 * ROW_BAR_SHARE).round() as u32
+}
+
+/// The room a book row's bar takes on its second line, with its gaps.
+pub fn music_row_bar_room(canvas: Canvas) -> u32 {
+    music_row_bar_w(canvas) + 2 * ROW_BAR_GAP as u32
 }
 
 /// How strongly the playing row's thumbnail is shaded under its play mark, of the ground.
@@ -328,6 +382,9 @@ fn draw_values(list: &ListFaces, grid: Grid, right: f32, out: &mut Vec<Draw>) {
         let Some((tex, w, h)) = *value else {
             continue;
         };
+        if done(list, i).is_some() {
+            continue;
+        }
         let y = grid.row_mid(i, h);
         match (list.carets, list.selected == Some(i)) {
             (Some([(lt, lw, lh), (rt, rw, rh)]), true) => {
@@ -436,29 +493,49 @@ mod tests {
     }
 
     #[test]
-    fn a_book_begun_has_a_bar_along_its_thumbnail_s_foot_filled_as_far_as_it_is() {
+    fn a_book_begun_has_its_bar_after_its_author_and_its_time_left_after_that() {
+        let face = |i, w| Some((TexId(i), w, 30));
+        // A book not begun, its value at the right; and one a quarter through.
         let list = ListFaces {
-            two_lines: true,
-            thumbed: true,
-            thumbs: vec![None, None],
+            rows: vec![face(1, 200), face(2, 200)],
+            seconds: vec![face(3, 120), face(4, 120)],
+            values: vec![face(5, 90), face(6, 90)],
             done: vec![None, Some(0.25)],
+            two_lines: true,
+            per_page: 5,
             ..ListFaces::default()
         };
-        let grid = Grid::new(false, 5);
-        let bars = |i| {
-            let mut out = Vec::new();
-            draw_thumb(&list, grid, i, &MusicTheme::dark(), &mut out);
-            out.iter()
-                .filter_map(|d| match *d {
-                    Draw::Rect { y, w, h, .. } if h == PROGRESS_H => Some((y, w)),
-                    _ => None,
-                })
-                .collect::<Vec<_>>()
+        let canvas = Canvas::FRAMED;
+        let mut out = Vec::new();
+        draw(&list, canvas, &MusicTheme::dark(), &mut out);
+        let at = |id| {
+            out.iter().find_map(|d| match *d {
+                Draw::Tex { tex, x, .. } if tex == TexId(id) => Some(x),
+                _ => None,
+            })
         };
-        assert!(bars(0).is_empty(), "not begun");
-        let foot = grid.row_mid(1, THUMB_PX) + THUMB_PX as f32 - PROGRESS_H;
-        let full = THUMB_PX as f32;
-        assert_eq!(bars(1), [(foot, full), (foot, (full / 4.0).round())]);
+        let bars: Vec<(f32, f32)> = out
+            .iter()
+            .filter_map(|d| match *d {
+                Draw::Rect { x, w, h, .. } if h == PROGRESS_H => Some((x, w)),
+                _ => None,
+            })
+            .collect();
+        let pad = MENU_PAD as f32;
+        let start = at(4).unwrap() + 120.0 - pad + ROW_BAR_GAP;
+        let w = music_row_bar_w(canvas) as f32;
+        assert_eq!(
+            bars,
+            [(start, w), (start, (w / 4.0).round())],
+            "a quarter filled"
+        );
+        assert_eq!(
+            at(6),
+            Some(start + w + ROW_BAR_GAP - pad),
+            "the time left after it"
+        );
+        let right = canvas.w - QUICK_EDGE + pad - 90.0;
+        assert_eq!(at(5), Some(right), "not begun: its value at the right");
     }
 
     #[test]

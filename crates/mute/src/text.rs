@@ -512,11 +512,6 @@ pub fn of(n: usize, of: usize) -> String {
     format!("{n}/{of}")
 }
 
-/// How far through, 0 to 1, as a share: 42%.
-pub fn percent(done: f64) -> String {
-    format!("{:.0}%", done * 100.0)
-}
-
 /// A speed as players write it: 1×, 1.25×.
 pub fn speed(x: f32) -> String {
     let s = format!("{x:.2}");
